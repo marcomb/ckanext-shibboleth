@@ -3,10 +3,15 @@ Shibboleth identification plugin for CKAN 2.4.
 Install
 =======
 
-You can install ckanext-shibboleth with
+You can install ckanext-shibboleth either with
 
-	pip install -e git+git://github.com/geosolutions-it/ckanext-shibboleth.git#egg=ckanext-shibboleth
+    pip install -e git+git://github.com/geosolutions-it/ckanext-shibboleth.git#egg=ckanext-shibboleth
 	
+or
+
+    git clone https://github.com/geosolutions-it/ckanext-shibboleth.git
+    python setup.py install
+        
 	
 Plugin configuration
 ====================
