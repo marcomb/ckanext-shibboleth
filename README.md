@@ -18,19 +18,13 @@ Add the ``plugin:shibboleth`` section, customizing the env var names:
 
     [plugin:shibboleth]
     use = ckanext.repoze.who.shibboleth.plugin:make_identification_plugin
-    session = Shib-Session-ID
-    eppn = eppn
-    mail = mail
-    fullname = cn
-    # Add more key-worded parameters below
-    firstname = displayName
-    surname = sn
-    organization = homeOrganization
-    mobile = mobile
-    telephone = telephoneNumber
+    session = YOUR_HEADER_FOR_Shib-Session-ID
+    eppn = YOUR_HEADER_FOR_eppn
+    mail = YOUR_HEADER_FOR_mail
+    fullname = YOUR_HEADER_FOR_cn
 
     # These are needed to find out if we are receiving info from the Shibboleth module.
-    # Customize both if needed.
+    # Customize both right-side values if needed.
     check_auth_key=HTTP_SHIB_AUTHENTICATION_METHOD 
     check_auth_value=urn:oasis:names:tc:SAML:1.0:am:unspecified
 
@@ -42,7 +36,7 @@ Add ``shibboleth`` to the list of the identifier plugins:
         friendlyform;browser
         auth_tkt
 
-Add ``shibboleth`` to the list of the authenticator plugins:
+Add ``ckanext.repoze.who.shibboleth.extension:ShibbolethAuthenticator`` to the list of the authenticator plugins:
 
     [authenticators]
     plugins =
