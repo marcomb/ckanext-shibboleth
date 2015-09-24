@@ -6,7 +6,7 @@ import logging
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
-#import ckanext.shibboleth.actions as actions
+#from ckan.lib.plugins import DefaultTranslation  # CKAN 2.5 only
 
 from zope.interface import implements
 from repoze.who.interfaces import IAuthenticator
@@ -17,19 +17,20 @@ from ckan.model import User
 log = logging.getLogger(__name__)
 
 
-class CkanShibbolethPlugin(plugins.SingletonPlugin):
+class CkanShibbolethPlugin(plugins.SingletonPlugin
+    # , DefaultTranslation  # CKAN 2.5 only
+    ):
     '''
     Shibboleth plugin for CKAN
     '''
 
     plugins.implements(plugins.IRoutes, inherit=True)
     plugins.implements(plugins.IConfigurer)
-    #plugins.implements(plugins.IActions, inherit=True)
+#    plugins.implements(plugins.ITranslation)  # CKAN 2.5 only
 
     def update_config(self, config):
         """
-        This IConfigurer implementation causes CKAN to look in the `templates`
-        or 'public' directories present in this package for any customisations.
+        Override both IConfigurer and ITranslation
         """
         toolkit.add_template_directory(config, 'templates')
         #toolkit.add_public_directory(config, 'public')
@@ -45,16 +46,12 @@ class CkanShibbolethPlugin(plugins.SingletonPlugin):
                     action='shiblogin')
         return map
 
-    #def get_actions(self):
-        #""" Register actions. """
-        #return {'user_show': actions.user_show,
-                #'user_update': actions.user_update,
-            ##   'user_create': actions.user_create,
-        #}
-#
-
 
 class ShibbolethAuthenticator(object):
+    '''
+    This class implements functions for repoze, and it's declared in the who.ini file.
+    '''
+
     implements(IAuthenticator)
 
     def authenticate(self, environ, identity):

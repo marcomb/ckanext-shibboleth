@@ -32,12 +32,16 @@ setup(
     tests_require=['nose'],
     message_extractors={
         'ckanext': [
-                        ('**.py', 'python', None),
-                        ('repoze/who/shibboleth/templates/user/**.html', 'ckan', None),
-                        ],
+            ('**.py', 'python', None),
+            ('**/templates/**.html', 'ckan', None),
+            ],
     },
-    entry_points="""
-    [ckan.plugins]
-    shibboleth=ckanext.repoze.who.shibboleth.extension:CkanShibbolethPlugin
-    """,
+    entry_points={
+        'ckan.plugins': [
+            'shibboleth=ckanext.repoze.who.shibboleth.extension:CkanShibbolethPlugin',
+         ],
+        'babel.extractors': [
+            'ckan=ckan.lib.extract:extract_ckan',
+         ],
+    },
 )
