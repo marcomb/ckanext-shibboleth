@@ -2,10 +2,10 @@
 
 from setuptools import setup, find_packages
 
-version = '0.2.4'
+version = '1.0.0'
 
 setup(
-    name='ckanext-repoze-who-shibboleth',
+    name='ckanext-shibboleth',
     version=version,
     description="",
     long_description="""\
@@ -22,9 +22,8 @@ setup(
     license='AGPL',
     packages=find_packages(exclude=['ez_setup', 'tests']),
     namespace_packages=['ckanext',
-                        'ckanext.repoze',
-                        'ckanext.repoze.who',
-                        'ckanext.repoze.who.shibboleth'],
+                        'ckanext.shibboleth',
+                        'ckanext.shibboleth.repoze'],
     include_package_data=True,
     zip_safe=False,
     install_requires=[],
@@ -38,7 +37,7 @@ setup(
     },
     entry_points={
         'ckan.plugins': [
-            'shibboleth=ckanext.repoze.who.shibboleth.extension:CkanShibbolethPlugin',
+            'shibboleth=ckanext.shibboleth.plugin:CkanShibbolethPlugin',
          ],
         'babel.extractors': [
             'ckan=ckan.lib.extract:extract_ckan',

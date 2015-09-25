@@ -18,7 +18,7 @@ import ckan.model as model
 from urlparse import urlparse, urlunparse
 
 
-log = logging.getLogger("ckanext.repoze.who.shibboleth")
+log = logging.getLogger("ckanext.shibboleth")
 
 
 SHIBBOLETH = 'shibboleth'
@@ -63,7 +63,7 @@ class ShibbolethIdentifierPlugin(object):
         else:
             log.info('Shibboleth auth will be identified by %s = %s', self.check_auth_key, self.check_auth_value)
 
-        controller = 'ckanext.repoze.who.shibboleth.controller:ShibbolethController'
+        controller = 'ckanext.shibboleth.controller:ShibbolethController'
 
         self.login_url = url_for(controller=controller, action='shiblogin')
         self.login_form_url = url_for(controller='user', action='login')
@@ -114,7 +114,7 @@ class ShibbolethIdentifierPlugin(object):
     def dumpInfo(self, env):
 
         for k, v in env.iteritems():
-            log.info(' ENV %s -> %s', k, v)
+            log.debug(' ENV %s -> %s', k, v)
 
     def identify(self, environ):
         """
@@ -133,9 +133,9 @@ class ShibbolethIdentifierPlugin(object):
         #log.info("ShibbolethIdentifierPlugin :: identify")
         #log.info("auth -> %s", environ.get(self.check_auth_key, '-'))
         if (environ.get(self.check_auth_key, '') == self.check_auth_value):
-            log.info("Session is %r", environ.get(self.session, False))
-            log.info("is_shibboleth is %r", self.is_shib_session(environ))
-            log.info("request path: %s  request url: %s", request.path, self.login_url)
+            log.debug("Session is %r", environ.get(self.session, False))
+            log.debug("is_shibboleth is %r", self.is_shib_session(environ))
+            log.debug("request path: %s  request url: %s", request.path, self.login_url)
             self.dumpInfo(environ)
 
         # Logout user
@@ -254,7 +254,7 @@ class ShibbolethIdentifierPlugin(object):
 
             model.Session.add(user)
             model.Session.flush()
-            log.debug('Created new user {usr}'.format(usr=fullname))
+            log.info('Created new user {usr}'.format(usr=fullname))
 
         model.Session.commit()
         model.Session.remove()

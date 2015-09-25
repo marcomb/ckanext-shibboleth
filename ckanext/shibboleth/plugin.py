@@ -8,11 +8,6 @@ import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
 #from ckan.lib.plugins import DefaultTranslation  # CKAN 2.5 only
 
-from zope.interface import implements
-from repoze.who.interfaces import IAuthenticator
-
-from ckan.model import User
-
 
 log = logging.getLogger(__name__)
 
@@ -39,30 +34,9 @@ class CkanShibbolethPlugin(plugins.SingletonPlugin
         """
         Override IRoutes.before_map()
         """
-        controller = 'ckanext.repoze.who.shibboleth.controller:ShibbolethController'
+        controller = 'ckanext.shibboleth.controller:ShibbolethController'
         map.connect('shibboleth',
                     '/shibboleth/login',
                     controller=controller,
                     action='shiblogin')
         return map
-
-
-class ShibbolethAuthenticator(object):
-    '''
-    This class implements functions for repoze, and it's declared in the who.ini file.
-    '''
-
-    implements(IAuthenticator)
-
-    def authenticate(self, environ, identity):
-
-        if 'shibboleth_auth' in identity:
-            userid = identity['shibboleth_auth']
-            user = User.get(userid)
-            if user is None or not user.is_active():
-                log.info("ShibbolethAuthenticator: user not found: %s", userid)
-                return None
-            else:
-                log.info("ShibbolethAuthenticator: user found %s", userid)
-                return user.name
-        return None

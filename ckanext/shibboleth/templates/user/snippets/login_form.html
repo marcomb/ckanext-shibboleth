@@ -28,7 +28,7 @@ Example:
 
     {#<p>{{ _("Authentication by using Shibboleth login") }}</p><br />#}
     {% set came_from = h.get_request_param('came_from') %}
-    {% set login_url = h.url_for(controller='ckanext.repoze.who.shibboleth.controller:ShibbolethController', action='shiblogin', came_from=came_from or '') %}
+    {% set login_url = h.url_for(controller='ckanext.shibboleth.controller:ShibbolethController', action='shiblogin', came_from=came_from or '') %}
     <a tabindex="1" href="{{ login_url }}">
         <div class="btn btn-large" title="{{ _('Login via Shibboleth') }}">
 	Shibboleth
