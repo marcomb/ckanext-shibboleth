@@ -22,16 +22,21 @@ who.ini configuration
 Add the ``plugin:shibboleth`` section, customizing the env var names:
 
     [plugin:shibboleth]
-    use = ckanext.repoze.who.shibboleth.plugin:make_identification_plugin
+    use = ckanext.shibboleth.repoze.ident:make_identification_plugin
+
     session = YOUR_HEADER_FOR_Shib-Session-ID
     eppn = YOUR_HEADER_FOR_eppn
     mail = YOUR_HEADER_FOR_mail
     fullname = YOUR_HEADER_FOR_cn
 
-    # These are needed to find out if we are receiving info from the Shibboleth module.
-    # Customize both right-side values if needed.
+    check_auth_key=AUTH_TYPE
+    check_auth_value=shibboleth
+
+``check_auth_key`` and ``check_auth_value`` are needed to find out if we are receiving info from the Shibboleth module. Customize both right-side values if needed. For instance, older Shibboleth implementations may need this configuration:
+
     check_auth_key=HTTP_SHIB_AUTHENTICATION_METHOD 
     check_auth_value=urn:oasis:names:tc:SAML:1.0:am:unspecified
+    
 
 Add ``shibboleth`` to the list of the identifier plugins:
 
@@ -41,13 +46,13 @@ Add ``shibboleth`` to the list of the identifier plugins:
         friendlyform;browser
         auth_tkt
 
-Add ``ckanext.repoze.who.shibboleth.extension:ShibbolethAuthenticator`` to the list of the authenticator plugins:
+Add ``ckanext.shibboleth.repoze.auth:ShibbolethAuthenticator`` to the list of the authenticator plugins:
 
     [authenticators]
     plugins =
         auth_tkt
         ckan.lib.authenticator:UsernamePasswordAuthenticator
-        ckanext.repoze.who.shibboleth.extension:ShibbolethAuthenticator
+        ckanext.shibboleth.repoze.auth:ShibbolethAuthenticator
 
 Add ``shibboleth`` to the list of the challengers plugins:
 
