@@ -4,24 +4,27 @@ Repoze.who plugin for ckanext-shibboleth
 '''
 
 import logging
+from urlparse import urlparse, urlunparse
 
-from repoze.who.interfaces import IIdentifier, IChallenger
-
+from requests import Response
 from webob import Request, Response
 from zope.interface import implements
 
+from repoze.who.interfaces import IIdentifier, IChallenger
+
 from ckan.lib.helpers import url_for
+import ckan.lib.base as base
 import ckan.plugins.toolkit as toolkit
-
 import ckan.model as model
-
-from urlparse import urlparse, urlunparse
 
 
 log = logging.getLogger("ckanext.shibboleth")
 
 
 SHIBBOLETH = 'shibboleth'
+
+OP_NOT_EMPTY = 'not_empty'
+OP_EQUALS = 'equals'
 
 
 def make_identification_plugin(**kwargs):
@@ -34,43 +37,82 @@ class ShibbolethIdentifierPlugin(object):
     implements(IChallenger, IIdentifier)
 
     def is_shib_session(self, env):
-        #return env.get(self.session, False) and
-        return env.get(self.check_auth_key, '') == self.check_auth_value
 
-    def __init__(self, session, eppn, mail, fullname, **kwargs):
-        '''
+        val = env.get(self.check_auth_key, '')
+
+        if self.check_auth_op == OP_NOT_EMPTY:
+            return bool(val.strip())
+        elif self.check_auth_op == OP_EQUALS:
+            return val == self.check_auth_value
+        else:
+            return False
+
+    def _validate_auth_params(self, key, op, value):
+        ok = True
+        if op not in (OP_NOT_EMPTY, OP_EQUALS):
+            log.warning('Check auth operator not valid. Shibboleth auth will not work.')
+            ok = False
+        if key is None:
+            log.warning('Check auth key not set in who.ini. Shibboleth auth will not work.')
+            ok = False
+        if op == OP_EQUALS and value is None:
+            log.warning('Check auth values not set in who.ini. Shibboleth auth will not work.')
+            ok = False
+        if ok:
+            if op == OP_EQUALS:
+                log.info('Shibboleth auth will be identified by %s = %s', key, value)
+            elif op == OP_NOT_EMPTY:
+                log.info('Shibboleth auth will be identified by %s IS NOT EMPTY', key)
+
+    def _validate_name_params(self, full, name, surname):
+
+        if full:
+            log.info('Shibboleth will use fullname to create user (%s)', full)
+        else:
+            if name and surname:
+                log.info('Shibboleth will use givenname (%s) and surname (%s) to create user', name, surname)
+            else:
+                log.warning('User name/surname identification not set. Shibboleth auth will not work.')
+
+    def __init__(self, session, eppn, mail, **kwargs):
+        """
         Parameters here contain just names of the environment attributes defined
         in who.ini, not their values:
         @param session: 'Shib-Session-ID'
         @param eppn: 'eppn'
         @param organization: 'schacHomeOrganization'
         etc.
-        '''
+        """
 
         log.info("Initting ShibbolethIdentifierPlugin...")
 
-        self.session = session
-        self.eppn = eppn
-        self.mail = mail
-        self.fullname = fullname
+        self.key_session = session
+        self.key_eppn = eppn
+        self.key_mail = mail
+
+        self.key_fullname = kwargs.get('fullname', None)
+        self.key_givenname = kwargs.get('givenname', None)
+        self.key_surname = kwargs.get('surname', None)
+        self._validate_name_params(self.key_fullname, self.key_givenname, self.key_surname)
+
         self.extra_keys = {}
 
         self.check_auth_key = kwargs['check_auth_key']
-        self.check_auth_value = kwargs['check_auth_value']
-
-        if(self.check_auth_key is None or self.check_auth_value is None):
-            log.warning('Check auth values not set in who.ini. Shibboleth auth will not work.')
-        else:
-            log.info('Shibboleth auth will be identified by %s = %s', self.check_auth_key, self.check_auth_value)
+        self.check_auth_op = kwargs['check_auth_op']
+        self.check_auth_value = kwargs['check_auth_value'] if 'check_auth_value' in kwargs else None
+        self._validate_auth_params(self.check_auth_key, self.check_auth_op, self.check_auth_value)
 
         controller = 'ckanext.shibboleth.controller:ShibbolethController'
 
-        self.login_url = url_for(controller=controller, action='shiblogin')
-        self.login_form_url = url_for(controller='user', action='login')
-        self.logout_url = url_for(controller='user', action='logout')
+#        self.secured_login_url = url_for(controller=controller, action='shiblogin')
+#        self.secured_logout_url = url_for(controller=controller, action='shiblogout')
+        self.secured_login_url = base.config.get("ckanext.shib.login_path", "/shibboleth/login")
+        self.secured_logout_url = base.config.get("ckanext.shib.logout_path", "/")
+        self.ckan_login_url = url_for(controller='user', action='login')
+        self.ckan_logout_url = url_for(controller='user', action='logout')
 
     def challenge(self, environ, status, app_headers, forget_headers):
-        '''
+        """
         repoze.who.interfaces.IChallenger.challenge.
 
         "Conditionally initiate a challenge to the user to provide credentials."
@@ -83,7 +125,7 @@ class ShibbolethIdentifierPlugin(object):
         :param app_headers:  the headers list written into start_response by the downstream application.
         :param forget_headers:
         :return:
-        '''
+        """
 
         log.info("ShibbolethIdentifierPlugin :: challenge")
 
@@ -99,7 +141,7 @@ class ShibbolethIdentifierPlugin(object):
         if not locale_default and locale and not requested_url.startswith('/%s/' % locale):
             requested_url = "/%s%s" % (locale, requested_url)
 
-        url = self.login_form_url + "?%s=%s" % ("came_from", requested_url)
+        url = self.ckan_login_url + "?%s=%s" % ("came_from", requested_url)
 
         if not locale_default and locale:
             url = "/%s%s" % (locale, url)
@@ -112,9 +154,9 @@ class ShibbolethIdentifierPlugin(object):
         return response
 
     def dumpInfo(self, env):
+        for key in sorted(env.iterkeys()):
+            log.debug(' ENV %s -> %s', key, env[key])
 
-        for k, v in env.iteritems():
-            log.debug(' ENV %s -> %s', k, v)
 
     def identify(self, environ):
         """
@@ -122,7 +164,7 @@ class ShibbolethIdentifierPlugin(object):
 
         "Extract credentials from the WSGI environment and turn them into an identity."
 
-        This is called (twice) for every page load.
+        This is called for every page load.
 
         :param environ:  the WSGI environment.
         :return:
@@ -130,16 +172,10 @@ class ShibbolethIdentifierPlugin(object):
 
         request = Request(environ)
 
-        #log.info("ShibbolethIdentifierPlugin :: identify")
-        #log.info("auth -> %s", environ.get(self.check_auth_key, '-'))
-        if (environ.get(self.check_auth_key, '') == self.check_auth_value):
-            log.debug("Session is %r", environ.get(self.session, False))
-            log.debug("is_shibboleth is %r", self.is_shib_session(environ))
-            log.debug("request path: %s  request url: %s", request.path, self.login_url)
-            self.dumpInfo(environ)
+        log.debug("ShibbolethIdentifierPlugin :: identify ------------------------------------------------------------")
 
         # Logout user
-        if request.path == self.logout_url:
+        if request.path == self.ckan_logout_url:
             response = Response()
 
             for a, v in self.forget(environ, {}):
@@ -147,26 +183,30 @@ class ShibbolethIdentifierPlugin(object):
 
             response.status = 302
 
-            try:
-                url = url_for(controller='user', action='logged_out')
-            except AttributeError as e:
-                # sometimes url_for fails
-                log.warning('Error in url_for: %s', str(e))
-                url = '/'
+            # try:
+            #     url = url_for(controller='user', action='logged_out')
+            # except AttributeError as e:
+            #     # sometimes url_for fails
+            #     log.warning('Error in url_for: %s', str(e))
+            #     url = '/'
 
-            locale = environ.get('CKAN_LANG', None)
-            default_locale = environ.get('CKAN_LANG_IS_DEFAULT', True)
-            if not default_locale and locale:
-                url = "/%s%s" % (locale, url)
+            # locale = environ.get('CKAN_LANG', None)
+            # default_locale = environ.get('CKAN_LANG_IS_DEFAULT', True)
+            # if not default_locale and locale:
+            #     url = "/%s%s" % (locale, self.shib_logout_url)
 
-            response.location = url
+            response.location = self.secured_logout_url
             environ['repoze.who.application'] = response
 
             log.info("Shibboleth user logout successful: %r" % request)
             return {}
 
-        # Login user, if there's shibboleth headers and path is shiblogin
-        if self.is_shib_session(environ) and request.path == self.login_url:
+
+        # Login user, if there's shibboleth headers and path is secured
+        if request.path == self.secured_login_url:
+            self.dumpInfo(environ)
+
+        if self.is_shib_session(environ) and request.path == self.secured_login_url:
             user = self._get_or_create_user(environ)
 
             if not user:
@@ -182,20 +222,21 @@ class ShibbolethIdentifierPlugin(object):
 
             url = request.params.get('came_from', None)
             if not url:
-                try:
-                    url = toolkit.url_for(controller='package', action='search')
-                except AttributeError as e:
-                    # sometimes url_for fails
-                    log.warning('Error in url_for: %s', str(e))
-                    url = '/'
+               try:
+                  url = toolkit.url_for(controller='package', action='search')
+               except AttributeError as e:
+                  # sometimes url_for fails
+                  log.warning('Error in url_for: %s', str(e))
+                  url = '/'
 
+            if url:
                 locale = environ.get('CKAN_LANG', None)
                 default_locale = environ.get('CKAN_LANG_IS_DEFAULT', True)
                 if not default_locale and locale:
                     url = "/%s%s" % (locale, url)
 
-            response.location = url
-            environ['repoze.who.application'] = response
+                response.location = url
+                environ['repoze.who.application'] = response
 
             log.info("Shibboleth login successful: %r (%s)" % (user, response.location))
 
@@ -204,43 +245,44 @@ class ShibbolethIdentifierPlugin(object):
         # User not logging in or logging out, return empty dict
         return {}
 
-    def _get_or_create_user(self, env):
-        #WSGI Variables
-        #Shib-Application-ID            'default'
-        #Shib-Authentication-Instant    '2012-08-13T12:04:22.492Z'
-        #Shib-Authentication-Method     'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport'
-        #Shib-AuthnContext-Class        'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport'
-        #Shib-Identity-Provider         'https://idp.example.com/idp/shibboleth'
-        #Shib-Session-ID                '_7ec5a681e6dbae627c1cefcc7cb4d56a'
-        #Shib-Session-Index             '39dafd8477850f5e0b968e3561570197f2109948c1d374a7a2b4c9a7adbf8628'
-        #cn                             'My Other Self'
-        #givenName                      'My Other Self'
-        #mail                           'myother@self.com'
+    def _retrieve_fullname(self, env):
+        if self.key_fullname:
+            fullname = env.get(self.key_fullname, None)
+            if fullname:
+                return fullname
 
-        eppn = env.get(self.eppn, None)
-        fullname = env.get(self.fullname, None)
-        email = env.get(self.mail, None)
+        if self.key_surname and self.key_givenname:
+            name = env.get(self.key_givenname, None)
+            surname = env.get(self.key_surname, None)
+            if name and surname:
+                return name + ' ' + surname
+
+        log.warning('Can not retrieve user fullname. User not loaded.')
+        return None
+
+    def _get_or_create_user(self, env):
+
+        eppn = env.get(self.key_eppn, None)
+        fullname = self._retrieve_fullname(env)
+        email = env.get(self.key_mail, None)
 
         if not eppn or not fullname:
-            log.debug(
-                'Environ does not contain eppn or cn attributes, user not loaded.')
+            log.info('Environ does not contain user reference, user not loaded.')
             return None
 
         user = model.Session.query(model.User).autoflush(False) \
             .filter_by(openid=eppn).first()
 
-        # Check if user information from shibboleth has changed
         if user:
-            if (user.fullname != fullname or user.email != email):
-                log.debug('User attributes modified, updating.')
+            # Check if user information from shibboleth has changed
+            if user.fullname != fullname or user.email != email:
+                log.info('User attributes modified, updating.')
                 user.fullname = fullname
                 user.email = email
-
         else:  # user is None:
-            log.debug('User does not exists, creating new one.')
+            log.info('User does not exists, creating new one.')
 
-            basename = unicode(fullname, errors='ignore').lower().replace(' ',
-                                                                          '_')
+            basename = unicode(fullname, errors='ignore').lower().replace(' ', '_')
             username = basename
             suffix = 0
             while not model.User.check_name_available(username):
@@ -254,7 +296,7 @@ class ShibbolethIdentifierPlugin(object):
 
             model.Session.add(user)
             model.Session.flush()
-            log.info('Created new user {usr}'.format(usr=fullname))
+            log.info('Created new user {usr}'.format(usr=user.fullname))
 
         model.Session.commit()
         model.Session.remove()

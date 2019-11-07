@@ -6,6 +6,7 @@ import logging
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
+
 #from ckan.lib.plugins import DefaultTranslation  # CKAN 2.5 only
 
 
@@ -36,7 +37,12 @@ class CkanShibbolethPlugin(plugins.SingletonPlugin
         """
         controller = 'ckanext.shibboleth.controller:ShibbolethController'
         map.connect('shibboleth',
-                    '/shibboleth/login',
+                    "/shib_redirect_login",
                     controller=controller,
                     action='shiblogin')
+        map.connect('shibboleth',
+                    "/shib_redirect_logout",
+                    controller=controller,
+                    action='shiblogout')
+
         return map

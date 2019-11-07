@@ -15,9 +15,9 @@ log = logging.getLogger(__name__)
 
 
 class ShibbolethAuthenticator(object):
-    '''
+    """
     This class implements functions for repoze, and it's declared in the who.ini file.
-    '''
+    """
 
     implements(IAuthenticator)
 
